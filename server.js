@@ -267,6 +267,66 @@ app.delete('/api/direct-messages/:messageId', (req, res) => {
     });
 });
 
+app.post('/api/delete-account', (req, res) => {
+    const { userId } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'ID пользователя обязателен' });
+    }
+
+    db.serialize(() => {
+        db.run("BEGIN TRANSACTION;");
+
+        db.run("DELETE FROM messages WHERE user_id = ?", [userId], (err) => {
+            if (err) {
+                db.run("ROLLBACK;");
+                return res.status(500).json({ error: 'Ошибка при удалении сообщений пользователя' });
+            }
+
+            db.run("DELETE FROM direct_messages WHERE from_user = ? OR to_user = ?", [userId, userId], (err) => {
+                if (err) {
+                    db.run("ROLLBACK;");
+                    return res.status(500).json({ error: 'Ошибка при удалении личных сообщений пользователя' });
+                }
+
+                db.run("DELETE FROM users WHERE id = ?", [userId], function(err) {
+                    if (err) {
+                        db.run("ROLLBACK;");
+                        return res.status(500).json({ error: 'Ошибка при удалении пользователя' });
+                    }
+                    
+                    if (this.changes === 0) {
+                        db.run("ROLLBACK;");
+                        return res.status(404).json({ error: 'Пользователь не найден' });
+                    }
+
+                    db.run("COMMIT;");
+                    res.json({ success: true, message: 'Аккаунт успешно удален' });
+                });
+            });
+        });
+    });
+});
+
+// Новый API маршрут для получения контактов пользователя
+app.get('/api/my-contacts/:userId', (req, res) => {
+    const { userId } = req.params;
+
+    db.all(`
+        SELECT DISTINCT u.id, u.username, u.display_name, u.avatar_url
+        FROM users u
+        JOIN direct_messages dm ON (u.id = dm.from_user AND dm.to_user = ?) OR (u.id = dm.to_user AND dm.from_user = ?)
+        WHERE u.id != ?
+        ORDER BY u.username
+    `, [userId, userId, userId], (err, contacts) => {
+        if (err) {
+            console.error('Ошибка при получении контактов:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных при получении контактов' });
+        }
+        res.json(contacts);
+    });
+});
+
 // WebSocket соединения
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
