@@ -308,25 +308,6 @@ app.post('/api/delete-account', (req, res) => {
     });
 });
 
-// Новый API маршрут для получения контактов пользователя
-app.get('/api/my-contacts/:userId', (req, res) => {
-    const { userId } = req.params;
-
-    db.all(`
-        SELECT DISTINCT u.id, u.username, u.display_name, u.avatar_url
-        FROM users u
-        JOIN direct_messages dm ON (u.id = dm.from_user AND dm.to_user = ?) OR (u.id = dm.to_user AND dm.from_user = ?)
-        WHERE u.id != ?
-        ORDER BY u.username
-    `, [userId, userId, userId], (err, contacts) => {
-        if (err) {
-            console.error('Ошибка при получении контактов:', err);
-            return res.status(500).json({ error: 'Ошибка базы данных при получении контактов' });
-        }
-        res.json(contacts);
-    });
-});
-
 // WebSocket соединения
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -613,6 +594,28 @@ io.on('connection', (socket) => {
         }
     });
 });
+
+
+// Оптимизация Socket.IO
+const io = require('socket.io')(server, {
+  pingInterval: 25000,
+  pingTimeout: 60000,
+  transports: ['websocket', 'polling'],
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Оптимизация Express
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Health check для Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

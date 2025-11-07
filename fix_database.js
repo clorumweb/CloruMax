@@ -48,14 +48,6 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
                 FOREIGN KEY (from_user) REFERENCES users(id),
                 FOREIGN KEY (to_user) REFERENCES users(id)
             );
-
-            CREATE TABLE IF NOT EXISTS user_contacts (
-                user_id INTEGER NOT NULL,
-                contact_id INTEGER NOT NULL,
-                PRIMARY KEY (user_id, contact_id),
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (contact_id) REFERENCES users(id) ON DELETE CASCADE
-            );
         `, (err) => {
             if (err) {
                 console.error(err.message);
